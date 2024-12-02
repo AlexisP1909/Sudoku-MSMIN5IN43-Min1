@@ -15,7 +15,7 @@ namespace NeuralNetworkSolverCSharp
 	public class NeuralNetworkSolverCSharp:PythonSolverBase
 	{
 		
-        private static string modelPath = GetFullPath(@".\Models\sudoku.model");
+        private static string modelPath = GetFullPath(@"..\..\..\..\Sudoku.NeuralNetworkCSharp\Models\sudoku.keras");
 		private static BaseModel model;
 
         //static NeuralNetworkSolverCSharp()

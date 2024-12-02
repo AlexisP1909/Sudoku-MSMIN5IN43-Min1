@@ -5,7 +5,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Numpy.Bare" Version="3.8.5" />
+    <PackageReference Include="Keras.NET" Version="3.8.5" />
+    <PackageReference Include="Numpy.Bare" Version="3.11.1.33" />
  </ItemGroup>
 
   <ItemGroup>

@@ -1,7 +1,13 @@
-﻿using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Text;
 using Keras;
 using Keras.Models;
 using Numpy;
+using Python.Runtime;
 using Sudoku.Shared;
 
 namespace NeuralNetworkSolverCSharp
@@ -9,8 +15,35 @@ namespace NeuralNetworkSolverCSharp
 	public class NeuralNetworkSolverCSharp:PythonSolverBase
 	{
 		
-        private static string modelPath = GetFullPath(@".\Models\sudoku.zip");
-		private static Model model;
+        private static string modelPath = GetFullPath(@".\Models\sudoku.model");
+		private static BaseModel model;
+
+        //static NeuralNetworkSolverCSharp()
+        //{
+        //    try
+        //    {
+        //        // Initialize Python runtime
+        //        //InitializePythonRuntime();
+
+        //        // Log the model path
+        //        Console.WriteLine($"Model path: {modelPath}");
+
+        //        // Check if the file exists
+        //        if (!File.Exists(modelPath))
+        //        {
+        //            throw new FileNotFoundException($"Model file not found at path: {modelPath}");
+        //        }
+
+        //        // Load the model
+        //        model = NeuralNetHelper.LoadModel(modelPath);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        // Log the exception details
+        //        Console.WriteLine($"Error initializing model: {ex.Message}");
+        //        throw;
+        //    }
+        //}
 
         public override SudokuGrid Solve(SudokuGrid s)
         {
@@ -32,6 +65,33 @@ namespace NeuralNetworkSolverCSharp
         {
             return Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, relativePath));
         }
+
+        //private static void InitializePythonRuntime()
+        //{
+        //    // Set the Python home directory
+        //    string pythonHome = @"C:\Users\eliol\anaconda3\envs\sudoku_env";
+        //    Environment.SetEnvironmentVariable("PYTHONHOME", pythonHome, EnvironmentVariableTarget.Process);
+
+        //    // Set the Python DLL path
+        //    string pythonDll = @"C:\Users\eliol\anaconda3\envs\sudoku_env\python38.dll";
+        //    Runtime.PythonDLL = pythonDll;
+
+        //    // Set the Python path to include the site-packages directory
+        //    string pythonPath = @"C:\Users\eliol\anaconda3\envs\sudoku_env\Lib;C:\Users\eliol\anaconda3\envs\sudoku_env\DLLs;C:\Users\eliol\anaconda3\envs\sudoku_env\Lib\site-packages";
+        //    Environment.SetEnvironmentVariable("PYTHONPATH", pythonPath, EnvironmentVariableTarget.Process);
+
+        //    // Log the Python configuration
+        //    Console.WriteLine($"PYTHONHOME: {Environment.GetEnvironmentVariable("PYTHONHOME", EnvironmentVariableTarget.Process)}");
+        //    Console.WriteLine($"PYTHONPATH: {Environment.GetEnvironmentVariable("PYTHONPATH", EnvironmentVariableTarget.Process)}");
+        //    Console.WriteLine($"Python DLL: {Runtime.PythonDLL}");
+			
+			     //       // Set Python home and path for PythonEngine
+        //    PythonEngine.PythonHome = pythonHome;
+        //    PythonEngine.PythonPath = pythonPath;
+
+        //    // Initialize the Python engine
+        //    PythonEngine.Initialize();
+        //}
     }
 	public class NeuralNetHelper
 	{
@@ -42,9 +102,9 @@ namespace NeuralNetworkSolverCSharp
 			Setup.UseTfKeras();
 		}
 
-		public static Model LoadModel(string strpath)
+		public static BaseModel LoadModel(string strpath)
 		{
-			return Model.LoadModel(strpath);
+			return BaseModel.LoadModel(strpath);
 		}
 
 		public static NDarray GetFeatures(SudokuGrid objSudoku)
@@ -64,7 +124,7 @@ namespace NeuralNetworkSolverCSharp
 
 
 
-		public static SudokuGrid SolveSudoku(SudokuGrid s, Model model)
+		public static SudokuGrid SolveSudoku(SudokuGrid s, BaseModel model)
 		{
 			var features = GetFeatures(s);
 			while (true)

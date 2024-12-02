@@ -3,17 +3,14 @@ using Keras;
 using Keras.Models;
 using Numpy;
 using Sudoku.Shared;
-using System.Diagnostics;
-
 
 namespace NeuralNetworkSolverCSharp
 {
 	public class NeuralNetworkSolverCSharp:PythonSolverBase
 	{
 		
-        private static string archiModelPath = GetFullPath(@"..\..\..\..\Sudoku.NeuralNetworkCSharp\Models\model_architecture.json");
-        private static string weightsPath = GetFullPath(@"..\..\..\..\Sudoku.NeuralNetworkCSharp\Models\model.weights.h5");
-		private static BaseModel model;
+        private static string modelPath = GetFullPath(@".\Models\sudoku.zip");
+		private static Model model;
 
         public override SudokuGrid Solve(SudokuGrid s)
         {
@@ -28,7 +25,7 @@ namespace NeuralNetworkSolverCSharp
 			base.InitializePythonComponents();
 
 			// Load the model
-			model = NeuralNetHelper.LoadModel(archiModelPath, weightsPath);
+			model = NeuralNetHelper.LoadModel(modelPath);
 		}
 
 		private static string GetFullPath(string relativePath)
@@ -41,20 +38,14 @@ namespace NeuralNetworkSolverCSharp
 
 		static NeuralNetHelper()
 		{
+			//PythonEngine.PythonHome = @"C:\Users\eliol\anaconda3";
 			Setup.UseTfKeras();
 		}
 
-		public static BaseModel LoadModel(string archpath, string weightsPath)
-        {
-
-            Debug.WriteLine(archpath);
-            Debug.WriteLine(weightsPath);
-            var json = File.ReadAllText(archpath);
-            Debug.WriteLine(json);
-            var loaded_model = Sequential.ModelFromJson(json);
-            loaded_model.LoadWeight(weightsPath);
-            return loaded_model;
-        }
+		public static Model LoadModel(string strpath)
+		{
+			return Model.LoadModel(strpath);
+		}
 
 		public static NDarray GetFeatures(SudokuGrid objSudoku)
 		{
@@ -73,7 +64,7 @@ namespace NeuralNetworkSolverCSharp
 
 
 
-		public static SudokuGrid SolveSudoku(SudokuGrid s, BaseModel model)
+		public static SudokuGrid SolveSudoku(SudokuGrid s, Model model)
 		{
 			var features = GetFeatures(s);
 			while (true)

@@ -12,82 +12,93 @@ using Sudoku.Shared;
 
 namespace NeuralNetworkSolverCSharp
 {
-	public class NeuralNetworkSolverCSharp:ISudokuSolver
+	public class NeuralNetworkSolverCSharp:PythonSolverBase
 	{
 		
-        private static string modelPath = GetFullPath(@"..\..\..\..\Sudoku.NeuralNetworkCSharp\Models\sudoku.model");
+        private static string modelPath = GetFullPath(@".\Models\sudoku.model");
 		private static BaseModel model;
 
-        static NeuralNetworkSolverCSharp()
-        {
-            try
-            {
-                // Initialize Python runtime
-                InitializePythonRuntime();
+        //static NeuralNetworkSolverCSharp()
+        //{
+        //    try
+        //    {
+        //        // Initialize Python runtime
+        //        //InitializePythonRuntime();
 
-                // Log the model path
-                Console.WriteLine($"Model path: {modelPath}");
+        //        // Log the model path
+        //        Console.WriteLine($"Model path: {modelPath}");
 
-                // Check if the file exists
-                if (!File.Exists(modelPath))
-                {
-                    throw new FileNotFoundException($"Model file not found at path: {modelPath}");
-                }
+        //        // Check if the file exists
+        //        if (!File.Exists(modelPath))
+        //        {
+        //            throw new FileNotFoundException($"Model file not found at path: {modelPath}");
+        //        }
 
-                // Load the model
-                model = NeuralNetHelper.LoadModel(modelPath);
-            }
-            catch (Exception ex)
-            {
-                // Log the exception details
-                Console.WriteLine($"Error initializing model: {ex.Message}");
-                throw;
-            }
-        }
+        //        // Load the model
+        //        model = NeuralNetHelper.LoadModel(modelPath);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        // Log the exception details
+        //        Console.WriteLine($"Error initializing model: {ex.Message}");
+        //        throw;
+        //    }
+        //}
 
-        public SudokuGrid Solve(SudokuGrid s)
+        public override SudokuGrid Solve(SudokuGrid s)
         {
             return NeuralNetHelper.SolveSudoku(s, model);
         }
 
-        private static string GetFullPath(string relativePath)
+		protected override void InitializePythonComponents()
+		{
+			//declare your pip packages here
+			InstallPipModule("numpy");
+			InstallPipModule("tensorflow");
+			base.InitializePythonComponents();
+
+			// Load the model
+			model = NeuralNetHelper.LoadModel(modelPath);
+		}
+
+		private static string GetFullPath(string relativePath)
         {
-            return Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath));
+            return Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, relativePath));
         }
 
-        private static void InitializePythonRuntime()
-        {
-            // Set the Python home directory
-            string pythonHome = @"C:\Users\eliol\anaconda3\envs\sudoku_env";
-            Environment.SetEnvironmentVariable("PYTHONHOME", pythonHome, EnvironmentVariableTarget.Process);
+        //private static void InitializePythonRuntime()
+        //{
+        //    // Set the Python home directory
+        //    string pythonHome = @"C:\Users\eliol\anaconda3\envs\sudoku_env";
+        //    Environment.SetEnvironmentVariable("PYTHONHOME", pythonHome, EnvironmentVariableTarget.Process);
 
-            // Set the Python DLL path
-            string pythonDll = @"C:\Users\eliol\anaconda3\envs\sudoku_env\python38.dll";
-            Runtime.PythonDLL = pythonDll;
+        //    // Set the Python DLL path
+        //    string pythonDll = @"C:\Users\eliol\anaconda3\envs\sudoku_env\python38.dll";
+        //    Runtime.PythonDLL = pythonDll;
 
-            // Set the Python path to include the site-packages directory
-            string pythonPath = @"C:\Users\eliol\anaconda3\envs\sudoku_env\Lib;C:\Users\eliol\anaconda3\envs\sudoku_env\DLLs;C:\Users\eliol\anaconda3\envs\sudoku_env\Lib\site-packages";
-            Environment.SetEnvironmentVariable("PYTHONPATH", pythonPath, EnvironmentVariableTarget.Process);
+        //    // Set the Python path to include the site-packages directory
+        //    string pythonPath = @"C:\Users\eliol\anaconda3\envs\sudoku_env\Lib;C:\Users\eliol\anaconda3\envs\sudoku_env\DLLs;C:\Users\eliol\anaconda3\envs\sudoku_env\Lib\site-packages";
+        //    Environment.SetEnvironmentVariable("PYTHONPATH", pythonPath, EnvironmentVariableTarget.Process);
 
-            // Log the Python configuration
-            Console.WriteLine($"PYTHONHOME: {Environment.GetEnvironmentVariable("PYTHONHOME", EnvironmentVariableTarget.Process)}");
-            Console.WriteLine($"PYTHONPATH: {Environment.GetEnvironmentVariable("PYTHONPATH", EnvironmentVariableTarget.Process)}");
-            Console.WriteLine($"Python DLL: {Runtime.PythonDLL}");
+        //    // Log the Python configuration
+        //    Console.WriteLine($"PYTHONHOME: {Environment.GetEnvironmentVariable("PYTHONHOME", EnvironmentVariableTarget.Process)}");
+        //    Console.WriteLine($"PYTHONPATH: {Environment.GetEnvironmentVariable("PYTHONPATH", EnvironmentVariableTarget.Process)}");
+        //    Console.WriteLine($"Python DLL: {Runtime.PythonDLL}");
 			
-			            // Set Python home and path for PythonEngine
-            PythonEngine.PythonHome = pythonHome;
-            PythonEngine.PythonPath = pythonPath;
+			     //       // Set Python home and path for PythonEngine
+        //    PythonEngine.PythonHome = pythonHome;
+        //    PythonEngine.PythonPath = pythonPath;
 
-            // Initialize the Python engine
-            PythonEngine.Initialize();
-        }
+        //    // Initialize the Python engine
+        //    PythonEngine.Initialize();
+        //}
     }
 	public class NeuralNetHelper
 	{
 
 		static NeuralNetHelper()
 		{
-			PythonEngine.PythonHome = @"C:\Users\eliol\anaconda3";
+			//PythonEngine.PythonHome = @"C:\Users\eliol\anaconda3";
 			Setup.UseTfKeras();
 		}
 

@@ -1,10 +1,14 @@
-﻿using Sudoku.Shared;
+﻿using System.Reflection;
+using Sudoku.Shared;
 using Microsoft.ML.Probabilistic.Algorithms;
 using Microsoft.ML.Probabilistic.Distributions;
 using Microsoft.ML.Probabilistic.Math;
 using Microsoft.ML.Probabilistic.Models;
 using Microsoft.ML.Probabilistic.Models.Attributes;
 using Range = Microsoft.ML.Probabilistic.Models.Range;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.ML.Probabilistic;
 
 
 namespace Sudoku.GraphProba;
@@ -12,10 +16,24 @@ namespace Sudoku.GraphProba;
 public class GraphProba : ISudokuSolver
 {
 	private static RobustSudokuModel robustModel = new RobustSudokuModel();
+	
 	public SudokuGrid Solve(SudokuGrid s)
 	{
 		//var model = new NaiveSudokuModel();
-		return robustModel.SolveSudoku(s);
+		IGeneratedAlgorithm? compiledModel = null;
+		try
+		{
+			Assembly assembly = Assembly.LoadFrom(@".\compiledModel\Model_EP.dll");
+			Type modelType = assembly.GetTypes().FirstOrDefault(t => typeof(IGeneratedAlgorithm).IsAssignableFrom(t));
+			compiledModel = (IGeneratedAlgorithm)Activator.CreateInstance(modelType);
+		}
+		catch (IOException e)
+		{
+			return robustModel.SolveSudoku(s, compiledModel);
+		}
+		
+		Console.WriteLine(@"Using Precompiled Model...");
+		return robustModel.SolveSudoku(s, compiledModel);
 	}
 }
 
@@ -57,6 +75,8 @@ public class RobustSudokuModel
 	public VariableArray<Dirichlet> CellsPrior;
 	public VariableArray<Vector> ProbCells;
 	public VariableArray<int> Cells;
+	public int nbrOfIterations = 50;
+	public int NbIterationCells { get; set; } = 2;
 
 
 	private const double EpsilonProba = 0.00000001;
@@ -127,13 +147,16 @@ public class RobustSudokuModel
 		//IAlgorithm algo = new VariationalMessagePassing();
 		//IAlgorithm algo = new MaxProductBeliefPropagation();
 		//les algos ont ete teste cependant la difference lors du lancement du projet n'est pas facilement visible
-		algo.DefaultNumberOfIterations = 50;
+		algo.DefaultNumberOfIterations = nbrOfIterations;
 		//algo.DefaultNumberOfIterations = 200;
 
 
 
 
 		InferenceEngine = new InferenceEngine(algo);
+		InferenceEngine.Compiler.WriteSourceFiles = true;
+		InferenceEngine.Compiler.GeneratedSourceFolder = @"..\..\..\..\Sudoku.GraphProba\compiledModel";
+		InferenceEngine.Compiler.GenerateInMemory = false; // Forces saving to disk
 
 
 		//InferenceEngine.OptimiseForVariables = new IVariable[] { Cells };
@@ -144,7 +167,7 @@ public class RobustSudokuModel
 
 
 
-	public virtual SudokuGrid SolveSudoku(SudokuGrid s)
+	public virtual SudokuGrid SolveSudoku(SudokuGrid s, IGeneratedAlgorithm? compiledMod)
 	{
 		Dirichlet[] dirArray = Enumerable.Repeat(Dirichlet.Uniform(CellDomain.Count), CellIndices.Count).ToArray();
 
@@ -174,10 +197,62 @@ public class RobustSudokuModel
 			}
 		}
 
+		if (compiledMod != null)
+		{
+			compiledMod.SetObservedValue("CellsPrior", dirArray);
+			// compiledMod.Execute(nbrOfIterations);
+			// Dirichlet[] cellsProbsPosterior = compiledMod.Marginal<Dirichlet[]>("ProbCells");
+			//
+			//
+			// foreach (var cellIndex in CellIndices)
+			// {
+			// 	var row = cellIndex / 9;
+			// 	int col = cellIndex % 9;
+			// 	if (s.Cells[row, col] == 0)
+			// 	{
+			// 		//s.Cellules[cellIndex] = cellValues[cellIndex];
+			//
+			// 		var mode = cellsProbsPosterior[cellIndex].GetMode();
+			// 		var value = mode.IndexOf(mode.Max()) + 1;
+			// 		s.Cells[row, col] = value;
+			// 	}
+			// }
+			
+			int cellDiscovered = CountNonZeroElements(s.Cells);
 
-		CellsPrior.ObservedValue = dirArray;
+			// Iteration tant que l'on a pas découvert toutes les cases
+			while (cellDiscovered < CellIndices.Count)
+			{
+				Console.WriteLine("itération");
+				compiledMod.Execute(nbrOfIterations);
+				Dirichlet[] cellsProbsPosterior = compiledMod.Marginal<Dirichlet[]>("ProbCells");
 
-		DoInference(dirArray, s);
+				int[] bestCellsProbsPosteriorIndex = GetBestDirichletSubArrayIndex(cellsProbsPosterior, NbIterationCells, s.Cells);
+
+				foreach (var index in bestCellsProbsPosteriorIndex)
+				{
+					var mode = cellsProbsPosterior[index].GetMode();
+					var value = mode.IndexOf(mode.Max()) + 1;
+
+					Vector v = Vector.Constant(CellDomain.Count, EpsilonProba);
+					v[value - 1] = FixedValueProba;
+
+					dirArray[index] = Dirichlet.PointMass(v);
+
+					if (s.Cells[index / 9, index % 9] == 0)
+						cellDiscovered++;
+					s.Cells[index / 9, index % 9] = value;
+				}
+
+				CellsPrior.ObservedValue = dirArray;
+			}
+		}
+		else
+		{
+			CellsPrior.ObservedValue = dirArray;
+
+			DoInference(dirArray, s);
+		}
 		return s;
 	}
 
@@ -189,45 +264,105 @@ public class RobustSudokuModel
 		// Todo: tester en inférant sur d'autres variables aléatoire,
 		// et/ou en ayant une approche itérative: On conserve uniquement les cellules dont les valeurs ont les meilleures probabilités 
 		//et on réinjecte ces valeurs dans CellsPrior comme c'est également fait dans le projet neural nets. 
-		//
+		int cellDiscovered = CountNonZeroElements(s.Cells);
 
-
-		// IFunction draw_categorical(n)// where n is the number of samples to draw from the categorical distribution
-		// {
-		//
-		// r = 1
-
-
-		/* for (i=0; i<9; i++)
-			for (j=0; j<9; j++)
-				for (k=0; k<9; k++)
-					ps[i][j][k] = probs[i][j][k].p; */
-
-
-
-
-		//DistributionRefArray<Discrete, int> cellsPosterior = (DistributionRefArray<Discrete, int>)InferenceEngine.Infer(Cells);
-		//var cellValues = cellsPosterior.Point.Select(i => i + 1).ToList();
-
-
-		//Autre possibilité de variable d'inférence (bis)
-		Dirichlet[] cellsProbsPosterior = InferenceEngine.Infer<Dirichlet[]>(ProbCells);
-
-
-		foreach (var cellIndex in CellIndices)
+		// Iteration tant que l'on a pas découvert toutes les cases
+		while (cellDiscovered < CellIndices.Count)
 		{
-			var row = cellIndex / 9;
-			int col = cellIndex % 9;
-			if (s.Cells[row, col] == 0)
-			{
-				//s.Cellules[cellIndex] = cellValues[cellIndex];
+			Dirichlet[] cellsProbsPosterior = InferenceEngine.Infer<Dirichlet[]>(ProbCells);
 
-				var mode = cellsProbsPosterior[cellIndex].GetMode();
+			int[] bestCellsProbsPosteriorIndex = GetBestDirichletSubArrayIndex(cellsProbsPosterior, NbIterationCells, s.Cells);
+
+			foreach (var index in bestCellsProbsPosteriorIndex)
+			{
+				var mode = cellsProbsPosterior[index].GetMode();
 				var value = mode.IndexOf(mode.Max()) + 1;
-				s.Cells[row, col] = value;
+
+				Vector v = Vector.Constant(CellDomain.Count, EpsilonProba);
+				v[value - 1] = FixedValueProba;
+
+				dirArray[index] = Dirichlet.PointMass(v);
+
+				if (s.Cells[index / 9, index % 9] == 0)
+					cellDiscovered++;
+				s.Cells[index / 9, index % 9] = value;
 			}
+
+			CellsPrior.ObservedValue = dirArray;
 		}
 
+		//Autre possibilité de variable d'inférence (bis)
+		// Dirichlet[] cellsProbsPosterior = InferenceEngine.Infer<Dirichlet[]>(ProbCells);
+
+
+		// foreach (var cellIndex in CellIndices)
+		// {
+		// 	var row = cellIndex / 9;
+		// 	int col = cellIndex % 9;
+		// 	if (s.Cells[row, col] == 0)
+		// 	{
+		// 		//s.Cellules[cellIndex] = cellValues[cellIndex];
+		//
+		// 		var mode = cellsProbsPosterior[cellIndex].GetMode();
+		// 		var value = mode.IndexOf(mode.Max()) + 1;
+		// 		s.Cells[row, col] = value;
+		// 	}
+		// }
+
+	}
+	
+	private int[] GetBestDirichletSubArrayIndex(Dirichlet[] dirichletArray, int N, int[,] sudokuCells)
+	{
+		// Initialise la liste des N meilleurs index avec les N premiers index de dirichletArray pour les cellules vides
+		var emptyCells = sudokuCells
+			.Cast<int>()
+			.Select((cell, index) => new { cell, index })
+			.Where(x => x.cell == 0)
+			.Select(x => x.index)
+			.Take(N)
+			.ToArray();
+
+		// Pour chaque cellule == 0 du sudoku
+		foreach (var cellIndex in CellIndices)
+		{
+			if (sudokuCells[cellIndex / 9, cellIndex % 9] == 0)
+			{
+				var currentMode = dirichletArray[cellIndex].GetMode();
+
+				int minDirIndex = emptyCells[0];
+
+				// Récupère l'index du Dirichlet le plus petit de la liste d'index des meilleurs Dirichlet
+				foreach (var index in emptyCells)
+				{
+					var currentDirMode = dirichletArray[index].GetMode();
+					var minDirMode = dirichletArray[minDirIndex].GetMode();
+
+					if (currentDirMode.Max() < minDirMode.Max())
+					{
+						minDirIndex = index;
+					}
+				}
+				// Remplace ce Dirichlet si la valeur max du Dirichlet de la cellule actuelle est supérieure
+				if (dirichletArray[minDirIndex].GetMode().Max() < currentMode.Max())
+				{
+					emptyCells[Array.IndexOf(emptyCells, minDirIndex)] = cellIndex;
+				}
+			}
+		}
+		return emptyCells;
+	}
+	
+	private int CountNonZeroElements(int[,] array)
+	{
+		int count = 0;
+		foreach (var element in array)
+		{
+			if (element > 0)
+			{
+				count++;
+			}
+		}
+		return count;
 	}
 
 
